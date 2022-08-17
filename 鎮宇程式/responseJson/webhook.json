@@ -1,0 +1,13 @@
+{
+    "events": [{
+        "type":"coinPulse",
+        "timestamp": 1653457092123,
+        "source": {
+            "vendorHwid": "dj12300111",
+            "count": 1,
+            "inputPortId":1,
+            "offline":false
+        } 
+    }]
+}
+

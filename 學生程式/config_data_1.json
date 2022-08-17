@@ -1,0 +1,71 @@
+{
+  "Machinestate": {
+    "code": "Success",
+    "message": "ok",
+    "results": {
+      "locate": "淡水店",
+      "vendorHwid": "dj123002",
+      "model": [
+        {
+          "_id": 11,
+          "description": "超級旋風球-左投幣口",
+          "type": "投幣模組"
+        },
+        {
+          "_id": 12,
+          "description": "超級旋風球-中投幣口",
+          "type": "投幣模組"
+        },
+        {
+          "_id": 13,
+          "description": "超級旋風球-右投幣口",
+          "type": "投幣模組"
+        },
+        {
+          "_id": 21,
+          "description": "超級旋風球-左出票口",
+          "type": "出票模組"
+        },
+        {
+          "_id": 22,
+          "description": "超級旋風球-右出票口",
+          "type": "出票模組"
+        },
+        {
+          "_id": 41,
+          "description": "超級旋風球-電源",
+          "type": "電源模組"
+        }
+      ]
+    }
+  },
+  "Machinepower": {
+    "code": "Success",
+    "message": "ok",
+    "results": {}
+  },
+  "Machinepulse": {
+    "code": "Success",
+    "message": "ok",
+    "results": {
+      "ack": 1
+    }
+  },
+  "webhook": {
+    "events": [
+      {
+        "type": "lotteryPulse",
+        "timestamp": 1660285230054,
+        "source": {
+          "vendorHwid": "dj12300221",
+          "count": 7,
+          "inputPortId": 1,
+          "offline": false
+        }
+      }
+    ]
+  },
+  "coinvalue": {
+    "count": 0
+  }
+}

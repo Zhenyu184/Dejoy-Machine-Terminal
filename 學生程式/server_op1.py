@@ -218,4 +218,4 @@ try:
 finally:
     server.server_close()
     print ("Server stopped...")
-    GPIO.cleanup
+    GPIO.cleanup()

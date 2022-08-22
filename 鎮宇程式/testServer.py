@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 import http.server
 import requests
+#import RPi.GPIO as GPIO #樹梅派用
 import json
 import time
 import sys
@@ -27,6 +28,20 @@ globalIdDevice = "遊戲機"
 globalIdModel = "投幣模組"
 globalQueue = Queue(maxsize=32)
 
+#---------------GPIO變數宣告區---------------#
+globaCoinReset = 1 #控制投幾枚硬幣就觸發
+globaCoinTempStatus = 0 #投幣機暫時狀態
+globaCoinLastStatus = 0 #投幣機現在狀態
+globaCoinCounter  = 14
+globaLotteryMotor = 15
+globaLotteryCounter = 24
+
+#GPIO.setmode(GPIO.BCM)
+#GPIO.setwarnings(False) #清除之前的腳位設定
+#GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)
+#GPIO.setup(globaLotteryMotor, GPIO.OUT)
+#GPIO.setup(globaLotteryCounter, GPIO.IN)
+
 #---------------預設回傳宣告區---------------#
 defaultReply = {
     "code": "Success",
@@ -48,6 +63,7 @@ defaultWebhook = {
     }]
 }
 
+#---------------監聽外部迴圈區---------------#
 class responseServer(BaseHTTPRequestHandler):
     def _set_response(self):
         self.send_header('Content-type', 'application/json')
@@ -146,6 +162,7 @@ class responseServer(BaseHTTPRequestHandler):
         replydData = json.dumps(replyTemp, indent=4, ensure_ascii=False) #解析成JSON
         self.wfile.write(bytes(str(replydData), "utf-8"))
 
+#---------------監聽外部的執行續---------------#
 def externalServer( ):
     if sys.argv[1:]:
         port = int(sys.argv[1])
@@ -166,13 +183,19 @@ def externalServer( ):
     httpd.server_close()
     print("[main.externalServer] externalServer停止執行\n") #停止執行
 
+#---------------監聽內部的執行續---------------#
 def internalServer( ):
     while True:
-        time.sleep(2.05) 
+        time.sleep(2.01) 
         if globalQueue.empty(): #Queue是空的
             print("[main.internalServer] Queue是空的")
             
-            #偵測有無投幣/出票
+            #偵測有無投幣(腳位設定)
+            #GPIO.setmode(GPIO.BCM)
+            #GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP) 
+            #globaCoinTempStatus = globaCoinLastStatus #更新第二最新狀態
+            #globaCoinLastStatus = GPIO.input(globaCoinCounter) #更新最新狀態
+
 
         else: #Queue有東西(pop出來)
             print("[main.internalServer] Queue=",list(globalQueue.queue))
@@ -203,7 +226,7 @@ def internalServer( ):
 
     print("[main.internalServer] internalServer停止執行\n") #停止執行
         
-
+#---------------主執行續---------------#
 if __name__=="__main__":
     Thread1 = Thread(target=externalServer)
     Thread2 = Thread(target=internalServer)
@@ -211,6 +234,5 @@ if __name__=="__main__":
     Thread2.start()
     Thread1.join()
     Thread2.join()
-
 else: 
     print("[main.py] 幹電腦掛了")

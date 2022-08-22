@@ -110,4 +110,4 @@ try:
         sleep(0.05)          
         #print("data_status=",data_status,"count=",coin_count, "switch_status=", switch_status)
 finally:
-    GPIO.cleanup
+    GPIO.cleanup()

@@ -23,12 +23,18 @@ url = 'https://d1b7-60-248-161-128.jp.ngrok.io'
 coin_reset = 1
 coin_data  = 14
 
+lottery_in= 15
+lottery_out=24
+
 
 #GPIO setup
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 GPIO.setup(coin_reset, GPIO.IN)
 GPIO.setup(coin_data , GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+GPIO.setup(lottery_in, GPIO.OUT)
+GPIO.setup(lottery_out, GPIO.IN)
 
 #---------------------------#寫入timestamp#---------------------------#
 def timestampWrite(): 
@@ -57,7 +63,7 @@ def coinPulse():
     respfoo =coinPulse["webhook"]
     json_data = json.dumps(respfoo,ensure_ascii=False, indent=2)
     #格式
-    response = requests.post( url + '/webhook', json_data, headers)
+    #response = requests.post( url + '/webhook', json_data, headers)
     #print("state: ",response.status_code ," response: " , response.json())
     print("#--------------------------------end-----------------------------#"," \n"*2)
 #---------------------------#MainProgram#---------------------------#
@@ -73,17 +79,33 @@ try:
         data_status = GPIO.input(coin_data)
         switch_status = GPIO.input(coin_reset)
         print("data_status:",data_status)
-        
+        '''
         if switch_status == 0:   #投幣數值歸零
             coin_count = 0
             foo["coinvalue"]['count'] = coin_count
             with open("config_data_1.json", "w", encoding='utf-8')as w: 
                 w.write(json.dumps(foo, ensure_ascii=False, indent=2))
-        
+        '''
+        GPIO.output(lottery_in, GPIO.LOW)
         if data_status == 0 and last_status == 1:
             timestampWrite()    #寫入timestamp
             coinPulse()         #寫入投幣數值
-            print("目前總硬幣量:",coin_count)
+            #print("目前總硬幣量:",coin_count)
+            #GPIO輸出票
+            GPIO.output(lottery_in, GPIO.HIGH)
+            count_P = a = b = 0
+            while True:
+                if(count_P < 1):
+                    sleep(0.01) #取樣1次/1ms
+                    b = a
+                    a = GPIO.input(lottery_out)
+                    if(a == 1 and b == 0):  #正緣觸發
+                        count_P = count_P + 1
+                else:
+                    break
+            GPIO.output(lottery_in, GPIO.LOW)
+            print("coin ,lottery succes")
+            sleep(10)
         
         sleep(0.05)          
         #print("data_status=",data_status,"count=",coin_count, "switch_status=", switch_status)

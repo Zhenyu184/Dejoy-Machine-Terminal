@@ -11,10 +11,10 @@ HOST = "localhost"
 PORT = 3001
 respfoo = {}
 params ={}
-battery_data= 1
-coin_data  = 0
-lottery_in= 15
-lottery_out=24
+battery_data= 4
+coin_data  = 17
+lottery_in= 27
+lottery_out=22
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 GPIO.setup(battery_data, GPIO.OUT)
@@ -23,7 +23,7 @@ GPIO.setup(lottery_out, GPIO.IN)
 GPIO.setup(coin_data , GPIO.IN)
 
 
-url = "https://c3ea-60-248-161-128.jp.ngrok.io"
+url = ""
 #---------------------------#寫入timestamp#---------------------------#
 def timestampWrite(): 
     now = datetime.now()

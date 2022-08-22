@@ -19,10 +19,10 @@ dict = {}
 foo = {}
 url = ""
 #GPIO PIN SETUP
-coin_data  = 14
-
-lottery_in= 15
-lottery_out=24
+battery_data= 4
+coin_data  = 17
+lottery_in= 27
+lottery_out=22
 
 
 #GPIO setup

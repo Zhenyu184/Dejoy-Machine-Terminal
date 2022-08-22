@@ -32,9 +32,9 @@ globalQueue = Queue(maxsize=32)
 globaCoinReset = 1 #控制投幾枚硬幣就觸發
 globaCoinTempStatus = 0 #投幣機暫時狀態
 globaCoinLastStatus = 0 #投幣機現在狀態
-globaCoinCounter  = 14
-globaLotteryMotor = 15
-globaLotteryCounter = 24
+globaCoinCounter  = 17
+globaLotteryMotor = 22
+globaLotteryCounter = 27
 
 #GPIO.setmode(GPIO.BCM)
 #GPIO.setwarnings(False) #清除之前的腳位設定

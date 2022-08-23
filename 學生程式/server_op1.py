@@ -67,14 +67,14 @@ def lotteryPulse(count):
         lotteryPulse["webhook"]['events'][0]["source"]["count"] = count
     #GPIO輸出票
     GPIO.output(lottery_in, GPIO.HIGH)
-    count_P = a = b = 0
+    count_N = a = b = 0
     while True:
-        if(count_P < count):
+        if(count_N < count):
             sleep(0.01) #取樣1次/1ms
             b = a
             a = GPIO.input(lottery_out)
-            if(a == 1 and b == 0):  #正緣觸發
-                count_P = count_P + 1
+            if(a == 1 and b == 0):  #負緣觸發
+                count_N = count_N + 1
         else:
             break
     GPIO.output(lottery_in, GPIO.LOW)

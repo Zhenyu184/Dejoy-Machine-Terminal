@@ -68,23 +68,22 @@ try:
         #變數設定
         last_status = data_status
         data_status = GPIO.input(coin_data)
-        switch_status = GPIO.input(coin_reset)
         print("data_status:",data_status)
 
         GPIO.output(lottery_in, GPIO.LOW)
-        if data_status == 0 and last_status == 1:
+        if data_status == 0 and last_status == 1:#負緣觸發
             timestampWrite()    #寫入timestamp
             coinPulse()         #寫入投幣數值
             #GPIO輸出票
             GPIO.output(lottery_in, GPIO.HIGH)
-            count_P = a = b = 0
+            count_N = a = b = 0
             while True:
-                if(count_P < 1):
+                if(count_N < 1):
                     sleep(0.01) #取樣1次/1ms
                     b = a
                     a = GPIO.input(lottery_out)
-                    if(a == 1 and b == 0):  #正緣觸發
-                        count_P = count_P + 1
+                    if(a == 0 and b == 1):  #負緣觸發
+                        count_N = count_N + 1
                 else:
                     break
             GPIO.output(lottery_in, GPIO.LOW)

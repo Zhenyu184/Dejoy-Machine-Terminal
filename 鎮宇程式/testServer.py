@@ -2,6 +2,7 @@ from queue import Queue
 from threading import Thread
 #from http.server import SimpleHTTPRequestHandler
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import final
 from urllib.parse import parse_qs, urlparse
 import http.server
 import requests
@@ -36,14 +37,8 @@ globaLotteryTempStatus = 0 #投幣機暫時狀態
 globaLotteryLastStatus = 0 #投幣機現在狀態
 globaCount_N = 0           #投幣正緣計數
 globaCoinCounter  = 17
-globaLotteryMotor = 22
-globaLotteryCounter = 27
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False) #清除之前的腳位設定
-GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(globaLotteryMotor, GPIO.OUT)
-GPIO.setup(globaLotteryCounter, GPIO.IN)
+globaLotteryMotor = 27
+globaLotteryCounter = 22
 
 #---------------預設回傳宣告區---------------#
 defaultReply = {
@@ -184,26 +179,36 @@ def externalServer( ):
         httpd.serve_forever() #開始執行
     except KeyboardInterrupt:
         pass
-    httpd.server_close()
-    print("[main.externalServer] externalServer停止執行\n") #停止執行
+    finally:
+        httpd.server_close()
+        print("[main.externalServer] externalServer停止執行\n") #停止執行
 
 #---------------監聽內部的執行續---------------#
 def internalServer( ):
-    globaCoinTempStatus = 0 #投幣機暫時狀態
-    globaCoinLastStatus = 0 #投幣機現在狀態
-    globaLotteryTempStatus = 0 #投幣機暫時狀態
-    globaLotteryLastStatus = 0 #投幣機現在狀態
-    globaCount_N = 0           #投幣負緣計數
+
+    #初始變數宣告區
+    globaCoinTempStatus = 0     #投幣機暫時狀態
+    globaCoinLastStatus = 0     #投幣機現在狀態
+    globaLotteryTempStatus = 0  #出票機暫時狀態
+    globaLotteryLastStatus = 0  #出票機現在狀態
+    globaCount_N = 0            #出票機負緣計數
+    #初始腳位宣告區
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(globaLotteryMotor, GPIO.OUT)
+    GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    
     while True:
         time.sleep(0.01) 
         if globalQueue.empty(): #Queue是空的
             print("[main.internalServer] Queue是空的")
             
-            #偵測有無投幣(腳位設定)              
+            #偵測有無投幣(腳位設定)
+            GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)              
             globaCoinTempStatus = globaCoinLastStatus #更新第二最新狀態
             globaCoinLastStatus = GPIO.input(globaCoinCounter) #更新最新狀態
             if globaCoinLastStatus == 0 and globaCoinTempStatus == 1:#負緣觸發   
-                action =  "lotteryPulse"
+                action =  "coinPulse"
                 count = 1
 
                 #Webhook準備
@@ -224,17 +229,18 @@ def internalServer( ):
                 except:
                     print("[main.internalServer] Webhook失敗")
 
+
             #偵測有無出票(腳位設定)
             GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             globaLotteryTempStatus = globaLotteryLastStatus #更新第二最新狀態
             globaLotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
-
-            if globaLotteryMotor == 0:
-                if(globaLotteryLastStatus == 0 and globaLotteryTempStatus == 1):  #負緣觸發
+            MotorStatus = GPIO.input(globaLotteryMotor)            
+            if MotorStatus == 1:
+                if(globaLotteryLastStatus == 1 and globaLotteryTempStatus == 0):  #正緣觸發
                     globaCount_N = globaCount_N + 1
                     count = globaCount_N
-
-            elif globaLotteryMotor == 1 and globaCount_N != 0:                
+                    print("偵測出票數:",count)
+            elif MotorStatus == 0 and globaCount_N != 0:                
                 globaCount_N = 0
                 action =  "lotteryPulse"
 
@@ -265,14 +271,22 @@ def internalServer( ):
 
             #硬體投幣/出票處理
             if action == "coinPulse":
-                pass
+                GPIO.setup(globaCoinCounter, GPIO.OUT)
+                GPIO.output(globaCoinCounter, GPIO.LOW)
+                #GPIO輸出出幣
+                for i in range(int(count)):
+                    GPIO.output(globaCoinCounter, GPIO.HIGH)
+                    time.sleep(0.1)
+                    GPIO.output(globaCoinCounter, GPIO.LOW)
+                    time.sleep(0.05)
+
             elif action == "lotteryPulse":
                 GPIO.setup(globaLotteryMotor, GPIO.OUT)
                 #GPIO輸出票
                 GPIO.output(globaLotteryMotor, GPIO.HIGH)
                 globaCount_N = 0
                 while True:
-                    if(globaCount_N < count):
+                    if(globaCount_N < int(count)):
                         time.sleep(0.01) #取樣1次/1ms
                         globaLotteryTempStatus = globaLotteryLastStatus #更新第二最新狀態
                         globaLotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
@@ -302,7 +316,7 @@ def internalServer( ):
                 print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
             except:
                 print("[main.internalServer] Webhook失敗")
-
+    
     print("[main.internalServer] internalServer停止執行\n") #停止執行
         
 #---------------主執行續---------------#

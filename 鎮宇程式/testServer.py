@@ -6,6 +6,7 @@ from threading import Thread
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import final
 from urllib.parse import parse_qs, urlparse
+from pyngrok import ngrok
 import http.server
 import requests
 #import RPi.GPIO as GPIO #樹梅派用
@@ -77,6 +78,21 @@ def modelIdToMean(_id):
 
     return id % 10, mode1
 
+#---------------pyngrok產生外部網址執行續---------------#
+def getngrokServer():
+    http_tunnel= ngrok.connect(8000)
+    try:
+        while True:
+            print("-----------------------------------")
+            # Block until CTRL-C or some other terminating event
+
+            #webhookNgrokUrl給中間server
+
+            print(http_tunnel.public_url)
+            time.sleep(5*60)    # sleep for 5 minutes
+    finally:
+        print(" Shutting down ngrok.")
+        ngrok.kill()
 #---------------監聽外部迴圈區---------------#
 class responseServer(BaseHTTPRequestHandler):
     def _set_response(self):
@@ -267,7 +283,7 @@ def internalServer( ):
             modelNumber, model = modelIdToMean(_id)
 
             #硬體投幣/出票處理
-            if model == "投幣口":   #模擬投幣
+            if model == "投幣口":   #模擬投幣訊號
                 
                 #腳位設定
                 GPIO.setup(globaCoinCounter, GPIO.OUT)
@@ -279,10 +295,11 @@ def internalServer( ):
                     time.sleep(0.1)
                     GPIO.output(globaCoinCounter, GPIO.LOW)
                     time.sleep(0.05)
-                
+
                 CoinCount += count
 
-            elif model == "出票口":  #模擬出票
+            elif model == "出票口":  #模擬出票訊號
+                
                 #腳位設置
                 GPIO.setup(globaLotteryMotor, GPIO.OUT)
                 GPIO.output(globaLotteryMotor, GPIO.HIGH)
@@ -346,10 +363,13 @@ def internalServer( ):
 if __name__=="__main__":
     Thread1 = Thread(target=externalServer)
     Thread2 = Thread(target=internalServer)
+    Thread3 = Thread(target=getngrokServer)
     Thread1.start()
     Thread2.start()
+    Thread3.start()
     Thread1.join()
     Thread2.join()
+    Thread3.join()
     GPIO.cleanup()
 else: 
     print("[main.py] 幹電腦掛了")

@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from queue import Queue
 from re import T
 from threading import Thread
@@ -7,7 +8,7 @@ from typing import final
 from urllib.parse import parse_qs, urlparse
 import http.server
 import requests
-import RPi.GPIO as GPIO #樹梅派用
+#import RPi.GPIO as GPIO #樹梅派用
 import json
 import time
 import sys
@@ -23,11 +24,10 @@ globalHost = "localhost"
 globalPort = 8000
 
 #---------------終端變數宣告區---------------#
-globalId = "dj12300111"
-globalDescription = "東海龍珠-左投幣口"
+globalDeviceId = "dj123001"
+globalDescription = "東海龍珠"
 globalLocate = "淡水店"
 globalIdDevice = "遊戲機"
-globalIdModel = "投幣模組"
 globalQueue = Queue(maxsize=32)
 
 #---------------GPIO變數宣告區---------------#
@@ -49,13 +49,33 @@ defaultWebhook = {
         "type":"coinPulse",
         "timestamp": nowTime.timestamp(),
         "source": {
-            "vendorHwid": globalId,
+            "vendorHwid": globalDeviceId,
             "count": 1,
             "inputPortId":1,
             "offline":False
         } 
     }]
 }
+
+#---------------從模組id判斷意思---------------#
+def modelIdToMean(_id):
+    #輸入_id字串
+    #輸出二個參數 1.整數(int) 2.模組名(string)
+    _id = str(_id)[-2:]
+    id = int(_id)
+    #從_id分要求(要幹嘛)
+    if _id[0] == '1':
+        mode1 = "投幣口" #幾次投幣
+    elif _id[0] == '2':
+        mode1 = "出票口" #幾次出票
+    elif _id[0] == '3':
+        mode1 = "裁票口" #裁多少票
+    elif _id[0] == '4':
+        mode1 = "電源" #電源
+    else:
+        mode1 = "unknown"
+
+    return id % 10, mode1
 
 #---------------監聽外部迴圈區---------------#
 class responseServer(BaseHTTPRequestHandler):
@@ -74,6 +94,12 @@ class responseServer(BaseHTTPRequestHandler):
         if path == "/request/state":
             print("[main.externalServer] 問狀態")
             
+            #根據_id參數設定回內容
+            MoudelId = str(parameters["_id"])[-4:-2] #取後2位數成字串
+            modelNumber, model = modelIdToMean(MoudelId)
+
+            #檢查該模組機譨是否正常
+
             #回應中間server
             self.send_response(200)
             self._set_response()
@@ -81,10 +107,10 @@ class responseServer(BaseHTTPRequestHandler):
             replyTemp["code"] = "Success"
             replyTemp["message"] = "ok"
             replyTemp["results"] = {
-                "vendorHwid": globalId,
-                "description": globalDescription,
+                "vendorHwid": globalDeviceId + MoudelId,
+                "description": globalDescription + '-' + str(modelNumber) + '號' + model,
                 "locate": globalLocate,
-                "model": globalIdModel
+                "model": model
             }
             replydData = json.dumps(replyTemp, indent=4, ensure_ascii=False) #解析成JSON
             self.wfile.write(bytes(str(replydData), "utf-8"))
@@ -92,6 +118,13 @@ class responseServer(BaseHTTPRequestHandler):
         elif path == "/request/power":
             print("[main.externalServer] 要求開關機")
             
+            #根據_id參數設定回內容
+            MoudelId = str(parameters["_id"])[-4:-2] #取後2位數成字串，用來辨識model id
+            position = int(str(parameters["position"])[2]) #用來辨識要開要關的key
+            modelNumber, model = modelIdToMean(MoudelId)
+
+            #根據position進行開機或關機
+
             #回應中間server
             self.send_response(200)
             self._set_response()
@@ -116,7 +149,6 @@ class responseServer(BaseHTTPRequestHandler):
     def do_POST(self):
         
         #區域變數宣告區
-        _id = globalId
         count = 0
         action = ""
 
@@ -133,21 +165,12 @@ class responseServer(BaseHTTPRequestHandler):
         _id = rawJSON["_id"]
         count = rawJSON["count"]
 
-        #從_id分要求(要幹嘛)
-        if _id[8] == '1':
-            action = "coinPulse" #幾次投幣
-        elif _id[8] == '2':
-            action = "lotteryPulse" #幾次出票
-        elif _id[8] == '3':
-            action = "shredPulse" #裁多少票
-        elif _id[8] == '4':
-            action = "powerPulse" #電源
-        else:
-            action = "unknownPulse"
+        #分離_id後2碼(要幹嘛)
+        _id = str(_id)[-2:]
 
         #把動作加入Queue
         if globalQueue.full() == False: #如果Queue沒滿
-            globalQueue.put(action + ":" + str(count)) 
+            globalQueue.put(str(_id) + ":" + str(count)) 
             print("[main.externalServer] Queue=",list(globalQueue.queue))
 
         #回覆中間server
@@ -183,78 +206,83 @@ def externalServer( ):
 def internalServer( ):
 
     #初始變數宣告區
-    globaCoinTempStatus = 0     #投幣機暫時狀態
-    globaCoinLastStatus = 0     #投幣機現在狀態
-    globaLotteryTempStatus = 0  #出票機暫時狀態
-    globaLotteryLastStatus = 0  #出票機現在狀態
-    globaCount_N = 0            #出票機負緣計數
-    webhookstatus = False       #webhook觸發
+    CoinTempStatus = 0     #投幣機暫時狀態
+    CoinLastStatus = 0     #投幣機現在狀態
+    CoinCount = 0     #投幣觸發次數
+    LotteryTempStatus = 0  #出票機暫時狀態
+    LotteryLastStatus = 0  #出票機現在狀態
+    Count_N = 0            #出票機負緣計數
+    webhookStatus = False  #webhook觸發
 
-    #初始腳位宣告區
+    #初始GPIO腳位宣告區
+    GPIO.cleanup() #清除腳位設定
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(globaLotteryMotor, GPIO.OUT)
     GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.output(globaLotteryMotor, GPIO.LOW)
+    GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     
     while True:
         time.sleep(0.01) 
-        if globalQueue.empty(): #Queue是空的
+        #GPIO.cleanup() #偵測
+
+        if globalQueue.empty(): #Queue是否為空
             #print("[main.internalServer] Queue是空的")
             
-            #偵測有無投幣(腳位設定)
-            GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)              
-            globaCoinTempStatus = globaCoinLastStatus #更新第二最新狀態
-            globaCoinLastStatus = GPIO.input(globaCoinCounter) #更新最新狀態
+            #偵測有無投幣或出票(腳位設定)
+            GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP) #設定17腳位為input  
+            GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-            if globaCoinLastStatus == 0 and globaCoinTempStatus == 1: #負緣觸發(偵測投幣)   
-                #Webhook設置
-                action =  "coinPulse"
-                count = 1
-                globalId = "dj12300111"
-                webhookstatus = True 
+            #偵測投幣腳位有無投幣
+            CoinTempStatus = CoinLastStatus #更新第二最新狀態
+            CoinLastStatus = GPIO.input(globaCoinCounter) #更新最新狀態
+            if CoinLastStatus == 0 and CoinTempStatus == 1: #負緣觸發(偵測投幣)              
+                CoinCount = CoinCount + 1
 
             #偵測有無出票(腳位設定)            
             GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            globaLotteryTempStatus = globaLotteryLastStatus #更新第二最新狀態
-            globaLotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
+            LotteryTempStatus = LotteryLastStatus #更新第二最新狀態
+            LotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
             MotorStatus = GPIO.input(globaLotteryMotor)
 
             if MotorStatus == 1: #馬達為高電位時
-                if(globaLotteryLastStatus == 1 and globaLotteryTempStatus == 0): #正緣觸發(偵測出票數)
-                    globaCount_N = globaCount_N + 1
-                    count = globaCount_N
+                if(LotteryLastStatus == 1 and LotteryTempStatus == 0): #正緣觸發(偵測出票數)
+                    Count_N = Count_N + 1
+                    count = Count_N
                     print("偵測出票數:",count)
-            elif MotorStatus == 0 and globaCount_N != 0:  #偵測結束，webhook設置
-                globaCount_N = 0
+            elif MotorStatus == 0 and Count_N != 0:  #偵測結束，webhook設置
+                Count_N = 0
                 #Webhook設置
                 action =  "lotteryPulse"
-                globalId = "dj12300121"
-                webhookstatus = True
+                Id = "dj12300121"
+                webhookStatus = True
 
         else: #Queue有東西(pop出來)
             print("[main.internalServer] Queue=",list(globalQueue.queue))
             popTemp = globalQueue.get()
-            action = popTemp.split(':')[0]
+            _id = popTemp.split(':')[0]
             count = popTemp.split(':')[1]
             
+            #解析_id意義
+            modelNumber, model = modelIdToMean(_id)
+
             #硬體投幣/出票處理
-            if action == "coinPulse":   #模擬投幣
-                #腳位設置
+            if model == "投幣口":   #模擬投幣
+                
+                #腳位設定
                 GPIO.setup(globaCoinCounter, GPIO.OUT)
                 GPIO.output(globaCoinCounter, GPIO.LOW)
 
-                #GPIO輸出指定幣數
+                #GPIO輸出指定幣數  
                 for i in range(int(count)):
                     GPIO.output(globaCoinCounter, GPIO.HIGH)
                     time.sleep(0.1)
                     GPIO.output(globaCoinCounter, GPIO.LOW)
                     time.sleep(0.05)
+                
+                CoinCount += count
 
-                #Webhook設置
-                globalId = "dj12300111"
-
-            elif action == "lotteryPulse":  #出票
+            elif model == "出票口":  #模擬出票
                 #腳位設置
                 GPIO.setup(globaLotteryMotor, GPIO.OUT)
                 GPIO.output(globaLotteryMotor, GPIO.HIGH)
@@ -264,30 +292,43 @@ def internalServer( ):
                 while True:
                     if(globaCount_N < int(count)):
                         time.sleep(0.01) #取樣1次/1ms
-                        globaLotteryTempStatus = globaLotteryLastStatus #更新第二最新狀態
-                        globaLotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
-                        if(globaLotteryLastStatus == 1 and globaLotteryTempStatus == 0):  #正緣觸發(偵測出票數)
+                        LotteryTempStatus = LotteryLastStatus #更新第二最新狀態
+                        LotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
+                        if(LotteryLastStatus == 1 and LotteryTempStatus == 0):  #正緣觸發(偵測出票數)
                             globaCount_N = globaCount_N + 1
                     else:
                         break
                 GPIO.output(globaLotteryMotor, GPIO.LOW)
 
                 #Webhook設置
-                globalId = "dj12300121"
+                Id = "dj12300121"
 
             else:
-                pass
-            
-            webhookstatus = True    #Webhook觸發
+                pass #除了投幣和出票外不做任何動作
 
-        if webhookstatus == True:
+        #判斷投幣數是否大於門檻
+        if CoinCount >= globaCoinReset:
+            CoinCount = CoinCount - globaCoinReset
+
+            #啟動Webhook(準備)
+            webhookRaw = defaultWebhook
+            webhookRaw["events"][0]["type"] = "coinPulse"
+            webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
+            webhookRaw["events"][0]["source"]["vendorHwid"] = globalDeviceId + ""
+            webhookRaw["events"][0]["source"]["count"] = globaCoinReset
+            webhookRaw["events"][0]["source"]["inputPortId"] = Id[9]
+            webhookRaw["events"][0]["source"]["offline"] = False
+            webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
+            print("[main.internalServer] 送出Webhook:",webhookRaw)
+        
+        if webhookStatus == True:
             #Webhook準備
             webhookRaw = defaultWebhook
             webhookRaw["events"][0]["type"] = action
             webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
-            webhookRaw["events"][0]["source"]["vendorHwid"] = globalId
+            webhookRaw["events"][0]["source"]["vendorHwid"] = Id
             webhookRaw["events"][0]["source"]["count"] = count
-            webhookRaw["events"][0]["source"]["inputPortId"] = globalId[9]
+            webhookRaw["events"][0]["source"]["inputPortId"] = Id[9]
             webhookRaw["events"][0]["source"]["offline"] = False
             webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
             print("[main.internalServer] 送出Webhook:",webhookRaw)

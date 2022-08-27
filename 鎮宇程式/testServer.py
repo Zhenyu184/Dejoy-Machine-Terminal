@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 from pyngrok import ngrok
 import http.server
 import requests
-#import RPi.GPIO as GPIO #樹梅派用
+import RPi.GPIO as GPIO #樹梅派用
 import json
 import time
 import sys
@@ -25,10 +25,11 @@ globalHost = "localhost"
 globalPort = 8000
 
 #---------------終端變數宣告區---------------#
-globalDeviceId = "dj123001"
+globalDeviceId = "dj113001"
 globalDescription = "東海龍珠"
-globalLocate = "淡水店"
+globalLocate = "威秀店"
 globalIdDevice = "遊戲機"
+globalurl = "https://yyyyyy.jp.ngrok.io"
 globalQueue = Queue(maxsize=32)
 
 #---------------GPIO變數宣告區---------------#
@@ -57,15 +58,14 @@ defaultWebhook = {
         } 
     }]
 }
+
 defaultupdateUrl = {
     "events": [{
         "type":"ngrokurl",
         "timestamp": nowTime.timestamp(),
         "source": {
             "vendorHwid": globalDeviceId,
-            "count": 1,
-            "inputPortId":1,
-        
+            "ngrokUrl": globalurl
         } 
     }]
 }
@@ -98,9 +98,27 @@ def getngrokServer():
         while True:
             print("-----------------------------------")
             # Block until CTRL-C or some other terminating event
-
             #webhookNgrokUrl給中間server
             print(http_tunnel.public_url)
+            
+            #檢查該模組機譨是否正常
+            model = '11'
+
+            #將模組的ngrok送出
+            webhookRaw = defaultupdateUrl
+            webhookRaw["events"][0]["type"] = "ngrokurl"
+            webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
+            webhookRaw["events"][0]["source"]["vendorHwid"] = globalDeviceId + model
+            webhookRaw["events"][0]["source"]["ngrokUrl"] = http_tunnel.public_url
+            webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
+            print("[main.internalServer] 送出Webhook:",webhookRaw)
+            #Webhook送出
+            try:
+                response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=0.01)
+                print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
+            except:
+                print("[main.internalServer] Webhook失敗")
+
             time.sleep(5*60)    # sleep for 5 minutes
     finally:
         print(" Shutting down ngrok.")
@@ -226,11 +244,11 @@ def externalServer( ):
         httpd.serve_forever() #開始執行
     except KeyboardInterrupt:
         pass
-    finally:
-        httpd.server_close()
-        print("[main.externalServer] externalServer停止執行\n") #停止執行
 
-def webhookRequest():
+    httpd.server_close()
+    print("[main.externalServer] externalServer停止執行\n") #停止執行
+
+def webhookRequest(action, Id, count):
     #Webhook準備
     webhookRaw = defaultWebhook
     webhookRaw["events"][0]["type"] = action
@@ -249,54 +267,59 @@ def webhookRequest():
     except:
         print("[main.internalServer] Webhook失敗")
 
-def GPIOEmpty():
-    #初始變數宣告區
-    CoinTempStatus = 0     #投幣機暫時狀態
-    CoinLastStatus = 0     #投幣機現在狀態
-    LotteryTempStatus = 0  #出票機暫時狀態
-    LotteryLastStatus = 0  #出票機現在狀態
-    Count_N = 0            #出票機負緣計數
-    #偵測有無投幣或出票(腳位設定)
-    GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP) #設定17腳位為input  
-    GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+def GPIOEmpty(CoinLastStatus, LotteryLastStatus):
+    try:
+        #偵測有無投幣或出票(腳位設定)
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP) #設定17腳位為input  
+        GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    #偵測投幣腳位有無投幣
-    CoinTempStatus = CoinLastStatus #更新第二最新狀態
-    CoinLastStatus = GPIO.input(globaCoinCounter) #更新最新狀態
-    if CoinLastStatus == 0 and CoinTempStatus == 1: #負緣觸發(偵測投幣)              
-        CoinCount = CoinCount + 1
+        #偵測投幣腳位有無投幣
+        CoinTempStatus = CoinLastStatus #更新第二最新狀態
+        reCoinLastStatus = GPIO.input(globaCoinCounter) #更新最新狀態
+        
+        if CoinTempStatus == 1 and reCoinLastStatus == 0: #負緣觸發(偵測投幣)
+            
+            #webhook資料回傳
+            action = "coinPulse"
+            Id = globalDeviceId + "11"
+            count = 1         
+            webhookRequest(action, Id, count)
 
-    #偵測有無出票(腳位設定)            
-    LotteryTempStatus = LotteryLastStatus #更新第二最新狀態
-    LotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
-    MotorStatus = GPIO.input(globaLotteryMotor)
-    if MotorStatus == 1: #馬達為高電位時
-        if(LotteryLastStatus == 0 and LotteryTempStatus == 1): #負緣觸發(偵測出票數)
-            Count_N = Count_N + 1
-            count = Count_N
-            print("偵測出票數:",count)
-    elif MotorStatus == 0 and Count_N != 0: #偵測結束，webhook設置
-        Count_N = 0
-        #Webhook設置
-        action =  "lotteryPulse"
-        Id = "dj12300121"
-        webhookStatus = True
-    GPIO.cleanup() #清除腳位設定
+        #偵測有無出票(腳位設定)        
+        LotteryTempStatus = LotteryLastStatus #更新第二最新狀態
+        reLotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
+        MotorStatus = GPIO.input(globaLotteryMotor)
+        Count_N = 0    
+        if MotorStatus == 1: #馬達為高電位時
+            if(LotteryTempStatus == 0 and reLotteryLastStatus == 1): #正緣觸發(偵測出票數)
+                Count_N = Count_N + 1
+                count = Count_N
 
-def GPIOPop():
-    #初始變數宣告區
-    CoinTempStatus = 0     #投幣機暫時狀態
-    CoinLastStatus = 0     #投幣機現在狀態
-    LotteryTempStatus = 0  #出票機暫時狀態
-    LotteryLastStatus = 0  #出票機現在狀態
-    Count_N = 0            #出票機負緣計數
+                #webhook資料回傳
+                action = "lotteryPulse"
+                Id = globalDeviceId + "21"     
+                webhookRequest(action, Id, count)
+                print("偵測出票數:",count)
+        elif MotorStatus == 0 and Count_N != 0: #偵測結束，webhook設置
+            Count_N = 0
+
+        #回傳上個狀態
+        return reCoinLastStatus, reLotteryLastStatus
+
+    finally:
+        #清除腳位設定
+        GPIO.cleanup() 
+
+
+def GPIOPop(LotteryLastStatus, model, count):
 
     #初始GPIO腳位宣告區
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(globaLotteryCounter, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     #硬體投幣/出票處理
     if model == "投幣口":   #模擬投幣訊號
@@ -311,6 +334,11 @@ def GPIOPop():
             GPIO.output(globaCoinCounter, GPIO.LOW)
             time.sleep(0.05)
 
+        #webhook資料回傳
+        action = "coinPulse"
+        Id = globalDeviceId + "11"        
+        webhookRequest(action, Id, count) 
+
     elif model == "出票口":  #模擬出票訊號
         
         #腳位設置
@@ -324,30 +352,39 @@ def GPIOPop():
                 time.sleep(0.01) #取樣1次/1ms
                 LotteryTempStatus = LotteryLastStatus #更新第二最新狀態
                 LotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
-                if(LotteryLastStatus == 1 and LotteryTempStatus == 0):  #正緣觸發(偵測出票數)
+                if(LotteryTempStatus == 0 and LotteryLastStatus == 1):  #正緣觸發(偵測出票數)
                     Count_N = Count_N + 1
             else:
                 break
         GPIO.output(globaLotteryMotor, GPIO.LOW)
 
-        #Webhook設置
-        Id = "dj12300121"
+        #webhook資料回傳
+        action = "lotteryPulse"
+        Id = globalDeviceId + "21"      
+        webhookRequest(action, Id, count)
 
     else:
-        pass #除了投幣和出票外不做任何動作
-    GPIO.cleanup() #清除腳位設定
+        print(print("[main.GPIOPop] model = 無此模組"))
+    
+    #清除腳位設定
+    GPIO.cleanup() 
+    
 
 #---------------監聽內部的執行續---------------#
 def internalServer( ):
-    
+    #初始變數宣告區
+    reCoinLastStatus = 0     #投幣機現在狀態
+    reLotteryLastStatus = 0  #出票機現在狀態
+
     while True:
         time.sleep(0.01) 
         #GPIO.cleanup() #偵測
 
         if globalQueue.empty(): #Queue是否為空
             #print("[main.internalServer] Queue是空的") 
-            
-            GPIOEmpty()          
+            CoinLastStatus = reCoinLastStatus
+            LotteryLastStatus = reLotteryLastStatus
+            reCoinLastStatus, reLotteryLastStatus = GPIOEmpty(CoinLastStatus, LotteryLastStatus)          
 
         else: #Queue有東西(pop出來)
             print("[main.internalServer] Queue=",list(globalQueue.queue))
@@ -358,7 +395,8 @@ def internalServer( ):
             #解析_id意義
             modelNumber, model = modelIdToMean(_id)
 
-            GPIOPop()
+            LotteryLastStatus =reLotteryLastStatus
+            GPIOPop(LotteryLastStatus, model, count)
 
     print("[main.internalServer] internalServer停止執行\n") #停止執行
         

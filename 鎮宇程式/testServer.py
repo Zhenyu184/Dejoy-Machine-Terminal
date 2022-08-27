@@ -19,8 +19,8 @@ from nowTime import nowTime #nowTime.timestamp()
 
 #---------------網路變數宣告區---------------#
 globalProtocol = "HTTP/1.0"
-globalHeaders = {'Content-type': 'application/json'}
-globalUrl = ""
+globalHeaders = {'Content-Type': 'application/json'}
+globalUrl = "163.13.133.185:3000"
 globalHost = "localhost"
 globalPort = 8000
 
@@ -29,7 +29,7 @@ globalDeviceId = "dj113001"
 globalDescription = "東海龍珠"
 globalLocate = "威秀店"
 globalIdDevice = "遊戲機"
-globalurl = "https://yyyyyy.jp.ngrok.io"
+globangrokUrl = "https://yyyyyy.jp.ngrok.io"
 globalQueue = Queue(maxsize=32)
 
 #---------------GPIO變數宣告區---------------#
@@ -61,11 +61,11 @@ defaultWebhook = {
 
 defaultupdateUrl = {
     "events": [{
-        "type":"ngrokurl",
+        "type":"ngrokUrl",
         "timestamp": nowTime.timestamp(),
         "source": {
             "vendorHwid": globalDeviceId,
-            "ngrokUrl": globalurl
+            "ngrokUrl": globangrokUrl
         } 
     }]
 }
@@ -94,30 +94,34 @@ def modelIdToMean(_id):
 #---------------pyngrok產生外部網址執行續---------------#
 def getngrokServer():
     http_tunnel= ngrok.connect(8000)
+
     try:
         while True:
             print("-----------------------------------")
             # Block until CTRL-C or some other terminating event
             #webhookNgrokUrl給中間server
-            print(http_tunnel.public_url)
+            print(http_tunnel)
+            print("type=", type(http_tunnel.public_url),http_tunnel.public_url)
             
             #檢查該模組機譨是否正常
             model = '11'
 
             #將模組的ngrok送出
             webhookRaw = defaultupdateUrl
-            webhookRaw["events"][0]["type"] = "ngrokurl"
+            webhookRaw["events"][0]["type"] = "ngrokUrl"
             webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
             webhookRaw["events"][0]["source"]["vendorHwid"] = globalDeviceId + model
-            webhookRaw["events"][0]["source"]["ngrokUrl"] = http_tunnel.public_url
+            webhookRaw["events"][0]["source"]["ngrokUrl"] = str(http_tunnel.public_url)
             webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
             print("[main.internalServer] 送出Webhook:",webhookRaw)
             #Webhook送出
-            try:
-                response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=0.01)
-                print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
-            except:
-                print("[main.internalServer] Webhook失敗")
+            #try:
+            print(type(webhookRaw))
+            print(type(globalHeaders), globalHeaders)
+            response = requests.post( globalUrl + '/updateUrl', webhookRaw, globalHeaders, timeout=0.01)
+            print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
+            #except:
+            print("向",globalUrl + '/updateUrl'+"[main.internalServer] ngrokUrl失敗")
 
             time.sleep(5*60)    # sleep for 5 minutes
     finally:
@@ -259,7 +263,7 @@ def webhookRequest(action, Id, count):
     webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
     webhookRaw["events"][0]["source"]["vendorHwid"] = Id
     webhookRaw["events"][0]["source"]["count"] = count
-    webhookRaw["events"][0]["source"]["inputPortId"] = Id[9]
+    webhookRaw["events"][0]["source"]["inputPortId"] = 3
     webhookRaw["events"][0]["source"]["offline"] = False
     webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
     print("[main.internalServer] 送出Webhook:",webhookRaw)
@@ -269,7 +273,7 @@ def webhookRequest(action, Id, count):
         response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=0.01)
         print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
     except:
-        print("[main.internalServer] Webhook失敗")
+        print("向",globalUrl + '/webhook'+"[main.internalServer] Webhook失敗")
 
 def GPIOEmpty(CoinLastStatus, LotteryLastStatus):
     try:

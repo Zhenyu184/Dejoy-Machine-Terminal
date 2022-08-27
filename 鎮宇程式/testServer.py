@@ -20,7 +20,7 @@ from nowTime import nowTime #nowTime.timestamp()
 #---------------網路變數宣告區---------------#
 globalProtocol = "HTTP/1.0"
 globalHeaders = {'Content-Type': 'application/json'}
-globalUrl = "163.13.133.185:3000"
+globalUrl = "http://163.13.133.185:3000"
 globalHost = "localhost"
 globalPort = 8000
 
@@ -115,13 +115,13 @@ def getngrokServer():
             webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
             print("[main.internalServer] 送出Webhook:",webhookRaw)
             #Webhook送出
-            #try:
-            print(type(webhookRaw))
-            print(type(globalHeaders), globalHeaders)
-            response = requests.post( globalUrl + '/updateUrl', webhookRaw, globalHeaders, timeout=0.01)
-            print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
-            #except:
-            print("向",globalUrl + '/updateUrl'+"[main.internalServer] ngrokUrl失敗")
+            try:
+                print(type(webhookRaw))
+                print(type(globalHeaders), globalHeaders)
+                response = requests.post( globalUrl + '/updateUrl', webhookRaw, globalHeaders, timeout=0.01)
+                print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
+            except:
+                print("向",globalUrl + '/updateUrl'+"[main.internalServer] ngrokUrl失敗")
 
             time.sleep(5*60)    # sleep for 5 minutes
     finally:
@@ -270,14 +270,15 @@ def webhookRequest(action, Id, count):
     
     #Webhook送出
     try:
-        response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=0.01)
-        print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
+        response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=1)
+        #print("[main.internalServer] state: ",response.status_code ," response= ")
     except:
-        print("向",globalUrl + '/webhook'+"[main.internalServer] Webhook失敗")
+        print("向",globalUrl + '/webhook'+"[main.internalServer] Webhook失敗!")
 
 def GPIOEmpty(CoinLastStatus, LotteryLastStatus):
     try:
         #偵測有無投幣或出票(腳位設定)
+        #print("[GPIOEmpty] 偵測有無投幣")
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(globaCoinCounter , GPIO.IN, pull_up_down=GPIO.PUD_UP) #設定17腳位為input  
         GPIO.setup(globaLotteryMotor, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -290,12 +291,14 @@ def GPIOEmpty(CoinLastStatus, LotteryLastStatus):
         if CoinTempStatus == 1 and reCoinLastStatus == 0: #負緣觸發(偵測投幣)
             
             #webhook資料回傳
+            #print("[GPIOEmpty] 負緣觸發")
             action = "coinPulse"
             Id = globalDeviceId + "11"
             count = 1         
             webhookRequest(action, Id, count)
 
-        #偵測有無出票(腳位設定)        
+        #偵測有無出票(腳位設定)
+        #print("[GPIOEmpty] 偵測有無出票(")
         LotteryTempStatus = LotteryLastStatus #更新第二最新狀態
         reLotteryLastStatus = GPIO.input(globaLotteryCounter) #更新最新狀態
         MotorStatus = GPIO.input(globaLotteryMotor)
@@ -388,6 +391,7 @@ def internalServer( ):
         time.sleep(0.01) 
         #GPIO.cleanup() #偵測
 
+        #print("[internalServer] 偵測Queue是否為空")
         if globalQueue.empty(): #Queue是否為空
             #print("[main.internalServer] Queue是空的") 
             CoinLastStatus = reCoinLastStatus

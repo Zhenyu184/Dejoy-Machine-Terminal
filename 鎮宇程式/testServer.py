@@ -223,6 +223,10 @@ class responseServer(BaseHTTPRequestHandler):
         replyTemp = defaultReply
         self.send_response(200)
         self._set_response()
+        replyTemp = defaultReply
+        replyTemp["code"] = "Success"
+        replyTemp["message"] = "ok"
+        replyTemp["results"] = {}
         replydData = json.dumps(replyTemp, indent=4, ensure_ascii=False) #解析成JSON
         self.wfile.write(bytes(str(replydData), "utf-8"))
 

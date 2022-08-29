@@ -372,7 +372,7 @@ def GPIOPop(modelNumber, model, count):
                         count = 0
                     else:
                         print("[main.GPIOPop.model = 出票口] timeout: 還差票數%d張", (int(count)-Count_N))
-                        count  =(int(count)-Count_N)
+                        count = Count_N
                     break
             else:
                 break

@@ -121,7 +121,7 @@ def getngrokServer():
             except:
                 print("向",globalUrl + '/updateUrl'+"[main.getngrokServer] ngrokUrl失敗")
 
-            time.sleep(5*60)    # 5 minutes
+            time.sleep(3*60)    # 5 minutes
     finally:
         ngrok.disconnect(http_tunnel)
         print(" Shutting down ngrok.")

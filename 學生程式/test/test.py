@@ -1,3 +1,4 @@
+from ast import While
 import http.client, urllib.parse
 import pprint
 import json
@@ -6,16 +7,27 @@ import sys
 import requests
 from datetime import datetime
 from time import sleep
+import time
 #define value
 dict = {}
 pulse = {}
-time = {}
 foo = {}
 url = "https://b645-60-248-161-128.jp.ngrok.io"
 #url = "https://f0ca-163-13-133-72.jp.ngrok.io"
 
+globaLotteryMotor = 2
+print("[main.GPIOPop.model = 出票口] timeout : gpio",globaLotteryMotor,"無法取樣")
+'''
+timeout = time.time() + 5#(count+0.8)*(1/12)
+print(time.time() > timeout)
+while True:
+    if time.time() > timeout:
+        print("[main.GPIOPop.model = 出票口] timeout : gpio")
+        break 
+'''
 
 
+'''
 with open("config_data_1.json", "r", encoding='utf-8')as r:
     dict = json.load(r)
     for i in range(0, len(dict["Machinestate"]['results']["model"])):
@@ -27,7 +39,7 @@ with open("config_data_1.json", "r", encoding='utf-8')as r:
             pulse['results'].update(foo)
             print(pulse)
             break
-
+'''
 '''
 # 当前日期和时间
 def timestampWrite(): 

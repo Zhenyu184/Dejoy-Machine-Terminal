@@ -276,12 +276,12 @@ def webhookRequest(action, Id, count):
     webhookRaw["events"][0]["source"]["inputPortId"] = 3
     webhookRaw["events"][0]["source"]["offline"] = False
     webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
-    print("[main.internalServer] 送出Webhook:",webhookRaw)
+    #print("[main.internalServer] 送出Webhook:",webhookRaw)
     
     #Webhook送出
     try:
-        response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=3)
-        print("[main.internalServer] state: ",response.status_code ," response= ",response.json())
+        response = requests.post( globalUrl + '/webhook', webhookRaw, globalHeaders, timeout=0.01)
+        #print("[main.internalServer] state: ",response.status_code ," response= ",response.json())
     except:
         print("向",globalUrl + '/webhook'+"[main.internalServer] Webhook失敗!")
 

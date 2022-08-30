@@ -89,7 +89,16 @@ def modelIdToMean(_id):
     else:
         mode1 = "unknown"
 
-    return id % 10, mode1
+    if _id[1] == '1':
+        mode2 = "左" 
+    elif _id[1] == '2':
+        mode2 = "中" 
+    elif _id[1] == '3':
+        mode2 = "右" 
+    else:
+        mode2 = ""
+
+    return id % 10, mode1, mode2
 
 #---------------pyngrok產生外部網址執行續---------------#
 def getngrokServer():
@@ -103,23 +112,25 @@ def getngrokServer():
             #print(http_tunnel)
             print("type=", type(http_tunnel.public_url),http_tunnel.public_url)
             
-            #檢查該模組機譨是否正常
-            model = '11'
+            #檢查該模組機譨是否正常(未添加)
 
-            #將模組的ngrok送出
-            webhookRaw = defaultupdateUrl
-            webhookRaw["events"][0]["type"] = "ngrokUrl"
-            webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
-            webhookRaw["events"][0]["source"]["vendorHwid"] = globalDeviceId + model
-            webhookRaw["events"][0]["source"]["ngrokUrl"] = str(http_tunnel.public_url)
-            webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
-            print("[main.internalServer] 送出Webhook:",webhookRaw)
-            #Webhook送出
-            try:
-                response = requests.post( globalUrl + '/updateUrl', webhookRaw, globalHeaders, timeout=3)
-                print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
-            except:
-                print("向",globalUrl + '/updateUrl'+"[main.getngrokServer] ngrokUrl失敗")
+            #模組編號
+            model = ['11', '21']
+            for i in range(len(model)):
+                #將模組的ngrok送出
+                webhookRaw = defaultupdateUrl
+                webhookRaw["events"][0]["type"] = "ngrokUrl"
+                webhookRaw["events"][0]["timestamp"] = nowTime.timestamp()
+                webhookRaw["events"][0]["source"]["vendorHwid"] = globalDeviceId + model[i]
+                webhookRaw["events"][0]["source"]["ngrokUrl"] = str(http_tunnel.public_url)
+                webhookRaw = json.dumps( webhookRaw, ensure_ascii=False, indent=2)
+                print("[main.internalServer] 送出Webhook:",webhookRaw)
+                #Webhook送出
+                try:
+                    response = requests.post( globalUrl + '/updateUrl', webhookRaw, globalHeaders, timeout=3)
+                    print("[main.internalServer] state: ",response.status_code ," response: " , response.json())
+                except:
+                    print("向",globalUrl + '/updateUrl'+"[main.getngrokServer] ngrokUrl失敗")
 
             time.sleep(3*60)    # 5 minutes
     finally:
@@ -145,7 +156,7 @@ class responseServer(BaseHTTPRequestHandler):
             
             #根據_id參數設定回內容
             MoudelId = str(parameters["_id"])[-4:-2] #取後2位數成字串
-            modelNumber, model = modelIdToMean(MoudelId)
+            modelNumber, model, direction = modelIdToMean(MoudelId)
 
             #檢查該模組機譨是否正常
 
@@ -157,7 +168,7 @@ class responseServer(BaseHTTPRequestHandler):
             replyTemp["message"] = "ok"
             replyTemp["results"] = {
                 "vendorHwid": globalDeviceId + MoudelId,
-                "description": globalDescription + '-' + str(modelNumber) + '號' + model,
+                "description": globalDescription + '-' + direction + model,
                 "locate": globalLocate,
                 "model": model
             }
@@ -170,7 +181,7 @@ class responseServer(BaseHTTPRequestHandler):
             #根據_id參數設定回內容
             MoudelId = str(parameters["_id"])[-4:-2] #取後2位數成字串，用來辨識model id
             position = int(str(parameters["position"])[2]) #用來辨識要開要關的key
-            modelNumber, model = modelIdToMean(MoudelId)
+            modelNumber, model, direction = modelIdToMean(MoudelId)
 
             #根據position進行開機或關機
 
@@ -423,7 +434,7 @@ def internalServer( ):
                 count = popTemp.split(':')[1]
 
                 #解析_id意義
-                modelNumber, model = modelIdToMean(_id)
+                modelNumber, model, direction= modelIdToMean(_id)
 
                 #GPIOPop執行腳位訊號輸出
                 GPIOPop(modelNumber, model, count)

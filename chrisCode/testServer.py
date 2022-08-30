@@ -344,9 +344,9 @@ def GPIOPop(modelNumber, model, count):
         #GPIO輸出指定幣數  
         for i in range(int(count)):
             GPIO.output(globaCoinCounter, GPIO.LOW)
-            time.sleep(0.1)
+            time.sleep(0.075)
             GPIO.output(globaCoinCounter, GPIO.HIGH)
-            time.sleep(0.05)
+            time.sleep(0.7)
 
         #webhook資料回傳
         action = "coinPulse"

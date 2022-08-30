@@ -90,11 +90,11 @@ def modelIdToMean(_id):
         mode1 = "unknown"
 
     if _id[1] == '1':
-        mode2 = "左" 
+        mode2 = "第一" 
     elif _id[1] == '2':
-        mode2 = "中" 
+        mode2 = "第二" 
     elif _id[1] == '3':
-        mode2 = "右" 
+        mode2 = "第三" 
     else:
         mode2 = ""
 

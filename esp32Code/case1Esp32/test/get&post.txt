@@ -1,0 +1,43 @@
+http.begin(serverPath.c_str());
+        int httpResponseCode = http.GET();
+        int httpResponseCode = http.POST(httpRequestData);
+        if (httpResponseCode > 0) {
+          Serial.print("[heartbeat] heartbeat success!");
+          //Serial.println(httpResponseCode);
+          String payload = http.getString();
+          Serial.println(payload);
+          statusFlag = connectedServer;
+        } else {
+          Serial.print("[watchDog] Error code: ");
+          Serial.println(httpResponseCode);
+          statusFlag = connectedInternet;
+        }
+
+void askRequest( void * parameter ) {
+    HTTPClient http;
+    String serverPath = globleServerPath + "/heartbeat";
+    String httpRequestData = "{}";
+    int httpResponseCode = 0;
+    
+    while (true) {
+      if(WiFi.status()== WL_CONNECTED){
+        http.begin(serverPath.c_str());
+        http.setTimeout(1500);
+        httpResponseCode = http.POST(httpRequestData);
+        if (httpResponseCode > 0) {
+          Serial.println("[askRequest] heartbeat success!");
+          statusFlag = connectedServer;
+          
+          //將詢問結果push
+
+        } else {
+          //Serial.print("[askRequest] askRequest Error code: ");
+          Serial.println(httpResponseCode);
+          statusFlag = connectedInternet;
+        }
+        vTaskDelay(1800 / portTICK_RATE_MS ); //1.8秒確認一次
+      }else {
+        Serial.println("[askRequest] WiFi Disconnected");
+      } 
+    }
+}
